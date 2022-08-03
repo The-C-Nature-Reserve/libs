@@ -106,3 +106,45 @@ Checks if `key` is present in the table
 ### Return
 - returns `0` / `false` if `key` is not present
 - returns 1 / `true` if `key` is present
+
+## smap_iter_next
+```smap_iter_t smap_iter_next(smap_t* m, smap_iter_t i);```
+
+### Definition
+Can be used to iterate over `m`. If passed a `SMAP_NULL` as `i` it returns first element
+in `m` if `i` is last element in `m` it returns `SMAP_NULL`.
+
+### Return
+- returns first element in `m` if `i == SMAP_NULL`
+- returns next element in `m` if `i != SMAP_NULL && i in m`
+- returns `SMAP_NULL` if `i` is last element in `m`
+
+### Caution
+- Don't `delete` the current iterator in any way. This will result in
+  **undifined behavior** for the next `smap_iter_next` call
+
+## smap_iter_key
+```char* smap_iter_key(smap_t* m, smap_iter_t i);```
+
+### Definition
+If given a valid `i` it returns the associated `key` pointer
+
+### Returns
+- Always returns pointer stored as `key`
+
+### Caution
+- Expects valid `i`, does not perform any check at all
+- Don't alter memory `key` points to. Will result in **undifined behavior**
+
+## smap_iter_value
+```void* smap_iter_value(smap_t* m, smap_iter_t i);```
+
+### Definition
+If given a valid `i` it returns the associated `value` pointer
+
+### Returns
+- Always returns pointer stored as `value`
+
+### Caution
+- Expects valid `i`, does not perform any check at all
+

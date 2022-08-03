@@ -5,6 +5,7 @@ con/build/*
 
 smap/out
 smap/build/*
+smap/test/*
 
 log.log*
 vg*

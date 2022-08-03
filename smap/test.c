@@ -8,6 +8,50 @@
 #define START_TEST() printf("TESTING: %s:\t", __func__);
 #define END_TEST() printf("DONE\n");
 
+void test_iter(void)
+{
+    START_TEST();
+    smap_t* m = smap_create(1);
+    char* ss[] = { "Hello", "World", "I", "am", "Ben" };
+
+    smap_insert(m, ss[0], (void*)1);
+    smap_insert(m, ss[1], (void*)2);
+    smap_insert(m, ss[2], (void*)3);
+    smap_insert(m, ss[3], (void*)4);
+    smap_insert(m, ss[4], (void*)5);
+
+    smap_iter_t i = SMAP_NULL;
+    char* key;
+    void* val;
+    while ((i = smap_iter_next(m, i)) != SMAP_NULL) {
+        key = smap_iter_key(m, i);
+        val = smap_iter_value(m, i);
+
+        switch ((uintptr_t)val) {
+        case 1:
+            assert(strcmp(key, ss[0]) == 0);
+            break;
+        case 2:
+            assert(strcmp(key, ss[1]) == 0);
+            break;
+        case 3:
+            assert(strcmp(key, ss[2]) == 0);
+            break;
+        case 4:
+            assert(strcmp(key, ss[3]) == 0);
+            break;
+        case 5:
+            assert(strcmp(key, ss[4]) == 0);
+            break;
+        default:
+            assert(0);
+        }
+    }
+
+    smap_free(m);
+    END_TEST();
+}
+
 void test_contains(void)
 {
     START_TEST();
@@ -336,6 +380,7 @@ void test_insert_get(void)
 int main(void)
 {
     test_init();
+    test_iter();
     test_insert_get();
     test_size();
     test_move_pair();
