@@ -33,7 +33,7 @@ NULL`
 - will not free memory associated with keys and values stored in the map. If the
   user uses heap allocations to store his stuff, it is his responsibility to
   clean it up. This can be most easily achieved with the `map_iter` utilities
-  or `map_move`
+  or `map_move_pair`
 
 ## smap_insert
 ```void* smap_insert(smap_t* m, char* key, void* value);```
@@ -71,8 +71,8 @@ Will return the with `key` associated `value`.
 ### Definition
 Returns the current size of the map
 
-## smap_move
-```void smap_move(smap_t* m, char* key, char** dest_key, void** dest_value);```
+## smap_move_pair
+```void smap_move_pair(smap_t* m, char* key, char** dest_key, void** dest_value);```
 
 ### Definition
 If `key` is present in the map it moves the `key` pointer stored into `dest_key`
@@ -86,3 +86,23 @@ interested in the associated pointer.
 - It will delete the entry: all pointers that point to heap blocks should be
   retrieved
 
+## smap_copy_pair
+```void smap_copy_pair(smap_t* m, char* key, char** dest_key, void** dest_value);```
+
+### Definition
+If `key` is present in the map it will copy the stored `key` pointer and `value`
+pointer to `dest_key` and `dest_value`
+
+### Caution
+- Since the stored `key` is still in the map, altering the memory it points to
+  will lead to **undefined behavior**
+
+## smap_contains
+```bool smap_contains(smap_t* m, char* key);```
+
+### Definition
+Checks if `key` is present in the table
+
+### Return
+- returns `0` / `false` if `key` is not present
+- returns 1 / `true` if `key` is present

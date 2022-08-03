@@ -15,6 +15,9 @@ smap_t* smap_create(uint32_t size);
 void* smap_insert(smap_t* m, char* key, void* value);
 void* smap_get(smap_t* m, char* key);
 uint32_t smap_size(smap_t* m);
-void smap_move(smap_t* m, char* key, char** dest_key, void** dest_value);
+bool smap_contains(smap_t* m, char* key);
+
+void smap_move_pair(smap_t* m, char* key, char** dest_key, void** dest_value);
+void smap_copy_pair(smap_t* m, char* key, char** dest_key, void** dest_value);
 
 #endif

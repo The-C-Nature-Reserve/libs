@@ -96,7 +96,7 @@ static inline void used_pop(smap_t* m, uint32_t pos)
     }
 }
 
-static int check_realloc(smap_t* m)
+static inline int check_realloc(smap_t* m)
 {
     if (m->unused != MAP_NULL) {
         return 0;
@@ -208,6 +208,15 @@ void smap_free(smap_t* m)
 
 uint32_t smap_size(smap_t* m) { return m->size; }
 
+bool smap_contains(smap_t* m, char* key)
+{
+    uint32_t map_pos;
+    uint32_t buf_pos;
+    uint32_t chain;
+    pos(m, HASH(key), key, &map_pos, &buf_pos, &chain);
+    return buf_pos != MAP_NULL;
+}
+
 // TODO: iter
 
 // insert set etc.
@@ -265,7 +274,7 @@ void* smap_get(smap_t* m, char* key)
     return m->buf[buf_pos].value;
 }
 
-void smap_move(smap_t* m, char* key, char** dest_key, void** dest_value)
+void smap_move_pair(smap_t* m, char* key, char** dest_key, void** dest_value)
 {
     uint32_t map_pos;
     uint32_t buf_pos;
@@ -273,13 +282,21 @@ void smap_move(smap_t* m, char* key, char** dest_key, void** dest_value)
     pos(m, HASH(key), key, &map_pos, &buf_pos, &chain);
 
     if (buf_pos == MAP_NULL) {
-        *dest_key = NULL;
-        *dest_value = NULL;
+        if (dest_key != NULL) {
+            *dest_key = NULL;
+        }
+        if (dest_value != NULL) {
+            *dest_value = NULL;
+        }
         return;
     }
 
-    *dest_key = m->buf[buf_pos].key;
-    *dest_value = m->buf[buf_pos].value;
+    if (dest_key != NULL) {
+        *dest_key = m->buf[buf_pos].key;
+    }
+    if (dest_value != NULL) {
+        *dest_value = m->buf[buf_pos].value;
+    }
 
     if (chain != MAP_NULL) {
         m->buf[chain].chain = MAP_NULL;
@@ -290,4 +307,32 @@ void smap_move(smap_t* m, char* key, char** dest_key, void** dest_value)
     used_pop(m, buf_pos);
     unused_push(m, buf_pos);
     m->size--;
+}
+
+// copy move semantics
+// ----------------------------------------------------------------------------
+
+void smap_copy_pair(smap_t* m, char* key, char** dest_key, void** dest_value)
+{
+    uint32_t map_pos;
+    uint32_t buf_pos;
+    uint32_t chain;
+    pos(m, HASH(key), key, &map_pos, &buf_pos, &chain);
+
+    if (buf_pos == MAP_NULL) {
+        if (dest_key != NULL) {
+            *dest_key = NULL;
+        }
+        if (dest_value != NULL) {
+            *dest_value = NULL;
+        }
+        return;
+    }
+
+    if (dest_key != NULL) {
+        *dest_key = m->buf[buf_pos].key;
+    }
+    if (dest_value != NULL) {
+        *dest_value = m->buf[buf_pos].value;
+    }
 }

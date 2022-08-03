@@ -45,8 +45,6 @@
 
 #endif
 
-// TODO: mingw
-
 #endif // COMPILER
 
 #ifndef CBUILD_EXE

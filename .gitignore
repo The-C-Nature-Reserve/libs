@@ -1,0 +1,10 @@
+cbuild
+
+con/out
+con/build/*
+
+smap/out
+smap/build/*
+
+log.log*
+vg*

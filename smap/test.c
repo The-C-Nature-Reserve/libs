@@ -8,7 +8,31 @@
 #define START_TEST() printf("TESTING: %s:\t", __func__);
 #define END_TEST() printf("DONE\n");
 
-void test_move(void)
+void test_contains(void)
+{
+    START_TEST();
+    smap_t* m = smap_create(1);
+
+    char s[] = "Hello";
+    assert(!smap_contains(m, s));
+    smap_insert(m, s, (void*)1);
+    assert(smap_contains(m, s));
+
+    char s1[] = "World";
+    assert(!smap_contains(m, s1));
+    smap_insert(m, s1, (void*)1);
+    assert(smap_contains(m, s1));
+
+    char s2[] = "I am Ben";
+    assert(!smap_contains(m, s2));
+    smap_insert(m, s2, (void*)1);
+    assert(smap_contains(m, s2));
+
+    smap_free(m);
+    END_TEST();
+}
+
+void test_copy_pair(void)
 {
     START_TEST();
 
@@ -29,48 +53,116 @@ void test_move(void)
     char* key;
     char* value;
 
-    smap_move(m, "Hello", &key, (void**)&value);
+    smap_copy_pair(m, "Hello", &key, (void**)&value);
+    assert(smap_size(m) == 5);
+    assert(key == ss[0]);
+    assert(value == (void*)1);
+
+    smap_copy_pair(m, "Hello", &key, (void**)&value);
+    assert(smap_size(m) == 5);
+    assert(key == ss[0]);
+    assert(value == (void*)1);
+
+    smap_copy_pair(m, "World", &key, (void**)&value);
+    assert(smap_size(m) == 5);
+    assert(key == ss[1]);
+    assert(value == (void*)2);
+
+    smap_copy_pair(m, "World", &key, (void**)&value);
+    assert(smap_size(m) == 5);
+    assert(key == ss[1]);
+    assert(value == (void*)2);
+
+    smap_copy_pair(m, "I", NULL, NULL);
+    assert(smap_size(m) == 5);
+
+    smap_copy_pair(m, "I", &key, (void**)&value);
+    assert(smap_size(m) == 5);
+    assert(key == ss[2]);
+    assert(value == (void*)3);
+
+    smap_copy_pair(m, "am", &key, (void**)&value);
+    assert(smap_size(m) == 5);
+    assert(key == ss[3]);
+    assert(value == (void*)4);
+
+    smap_copy_pair(m, "am", &key, (void**)&value);
+    assert(smap_size(m) == 5);
+    assert(key == ss[3]);
+    assert(value == (void*)4);
+
+    smap_copy_pair(m, "Ben", NULL, NULL);
+    assert(smap_size(m) == 5);
+
+    smap_copy_pair(m, "Ben", &key, (void**)&value);
+    assert(smap_size(m) == 5);
+    assert(key == ss[4]);
+    assert(value == (void*)5);
+
+    smap_free(m);
+
+    END_TEST();
+}
+
+void test_move_pair(void)
+{
+    START_TEST();
+
+    char* ss[] = { "Hello", "World", "I", "am", "Ben" };
+
+    smap_t* m = smap_create(1);
+
+    assert(smap_size(m) == 0);
+
+    smap_insert(m, ss[0], (void*)1);
+    smap_insert(m, ss[1], (void*)2);
+    smap_insert(m, ss[2], (void*)3);
+    smap_insert(m, ss[3], (void*)4);
+    smap_insert(m, ss[4], (void*)5);
+
+    assert(smap_size(m) == 5);
+
+    char* key;
+    char* value;
+
+    smap_move_pair(m, "Hello", &key, (void**)&value);
     assert(smap_size(m) == 4);
     assert(key == ss[0]);
     assert(value == (void*)1);
 
-    smap_move(m, "Hello", &key, (void**)&value);
+    smap_move_pair(m, "Hello", &key, (void**)&value);
     assert(key == NULL);
     assert(value == NULL);
 
-    smap_move(m, "World", &key, (void**)&value);
+    smap_move_pair(m, "World", &key, (void**)&value);
     assert(smap_size(m) == 3);
     assert(key == ss[1]);
     assert(value == (void*)2);
 
-    smap_move(m, "World", &key, (void**)&value);
+    smap_move_pair(m, "World", &key, (void**)&value);
     assert(key == NULL);
     assert(value == NULL);
 
-    smap_move(m, "I", &key, (void**)&value);
+    smap_move_pair(m, "I", NULL, NULL);
     assert(smap_size(m) == 2);
-    assert(key == ss[2]);
-    assert(value == (void*)3);
 
-    smap_move(m, "I", &key, (void**)&value);
+    smap_move_pair(m, "I", &key, (void**)&value);
     assert(key == NULL);
     assert(value == NULL);
 
-    smap_move(m, "am", &key, (void**)&value);
+    smap_move_pair(m, "am", &key, (void**)&value);
     assert(smap_size(m) == 1);
     assert(key == ss[3]);
     assert(value == (void*)4);
 
-    smap_move(m, "am", &key, (void**)&value);
+    smap_move_pair(m, "am", &key, (void**)&value);
     assert(key == NULL);
     assert(value == NULL);
 
-    smap_move(m, "Ben", &key, (void**)&value);
+    smap_move_pair(m, "Ben", NULL, NULL);
     assert(smap_size(m) == 0);
-    assert(key == ss[4]);
-    assert(value == (void*)5);
 
-    smap_move(m, "Ben", &key, (void**)&value);
+    smap_move_pair(m, "Ben", &key, (void**)&value);
     assert(key == NULL);
     assert(value == NULL);
 
@@ -246,6 +338,8 @@ int main(void)
     test_init();
     test_insert_get();
     test_size();
-    test_move();
+    test_move_pair();
+    test_copy_pair();
+    test_contains();
     return 0;
 }
