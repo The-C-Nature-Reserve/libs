@@ -5,8 +5,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#define START_TEST() printf("TESTING: %s:\t", __func__);
-#define END_TEST() printf("DONE\n");
+#define BLUE "\033[34m"
+#define RESET "\033[39m"
+#define GREEN "\033[32m"
+
+#define START_TEST() printf(BLUE "[TESTING:]" RESET " %s:\t", __func__);
+#define END_TEST() printf(GREEN "DONE\n" RESET);
 
 void test_iter(void)
 {

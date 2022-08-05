@@ -1,11 +1,6 @@
-cbuild
-
-con/out
-con/build/*
-
-smap/out
-smap/build/*
-smap/test/*
+beaver
 
 log.log*
 vg*
+
+build/*
