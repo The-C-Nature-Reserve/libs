@@ -26,8 +26,10 @@ void test_iter(void)
 
     smap_iter_t i = SMAP_NULL;
     char* key;
+    uint32_t count = 0;
     void* val;
     while ((i = smap_iter_next(m, i)) != SMAP_NULL) {
+        count++;
         key = smap_iter_key(m, i);
         val = smap_iter_value(m, i);
 
@@ -51,6 +53,8 @@ void test_iter(void)
             assert(0);
         }
     }
+
+    assert(count == 5);
 
     smap_free(m);
     END_TEST();
