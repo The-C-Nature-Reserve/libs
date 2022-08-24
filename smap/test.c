@@ -1,16 +1,11 @@
 #include "smap.h"
 
-#include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
-#define BLUE "\033[34m"
-#define RESET "\033[39m"
-#define GREEN "\033[32m"
+#include "../test.h"
 
-#define START_TEST() printf(BLUE "[TESTING:]" RESET " %s:\t", __func__);
-#define END_TEST() printf(GREEN "DONE\n" RESET);
 
 void test_iter(void)
 {

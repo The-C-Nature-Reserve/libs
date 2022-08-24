@@ -217,8 +217,6 @@ bool smap_contains(smap_t* m, char* key)
     return buf_pos != SMAP_NULL;
 }
 
-// TODO: iter
-
 // insert set etc.
 // ----------------------------------------------------------------------------
 
