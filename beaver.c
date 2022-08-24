@@ -9,6 +9,9 @@ module_t modules[] = {
     { .name = "smap", .src = "smap/smap.c" },
     { .name = "smap", .src = "smap/test.c" },
 
+    { .name = "sset", .src = "sset/sset.c" },
+    { .name = "sset", .src = "sset/test.c" },
+
     { .name = "argparse", .src = "smap/smap.c" },
     { .name = "argparse", .src = "argparse/argparse.c" },
     { .name = "argparse", .src = "argparse/test.c" },
@@ -20,12 +23,19 @@ module_t modules[] = {
 uint32_t modules_len = sizeof(modules) / sizeof(*modules);
 
 char* smap[] = { "smap", NULL };
+char* sset[] = { "sset", NULL };
 char* argparse[] = { "argparse", NULL };
 char* ezstr[] = { "ezstr", NULL };
 
 void cr_smap(void)
 {
     compile(smap, FLAGS);
+    call_or_panic("./out");
+}
+
+void cr_sset(void)
+{
+    compile(sset, FLAGS);
     call_or_panic("./out");
 }
 
@@ -44,6 +54,7 @@ void cr_argparse(void)
 void cr_all(void)
 {
     cr_smap();
+    cr_sset();
     cr_argparse();
     cr_ezstr();
 }
@@ -59,6 +70,8 @@ int main(int argc, char** argv)
         rm("out");
     } else if (strcmp(argv[1], "smap/") == 0) {
         cr_smap();
+    } else if (strcmp(argv[1], "sset/") == 0) {
+        cr_sset();
     } else if (strcmp(argv[1], "argparse/") == 0) {
         cr_argparse();
     } else if (strcmp(argv[1], "ezstr/") == 0) {
