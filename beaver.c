@@ -1,6 +1,3 @@
-#define BEAVER_AUTO_ASYNC
-#define ASAW_LOCATION "lib/asaw.c"
-
 #include "lib/beaver.h"
 
 #define FLAGS "-g -Wall -Werror -Og"
@@ -53,6 +50,7 @@ void cr_argparse(void)
 
 void cr_all(void)
 {
+    /*prepare_all(FLAGS);*/
     cr_smap();
     cr_sset();
     cr_argparse();

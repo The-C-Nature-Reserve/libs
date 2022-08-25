@@ -1,25 +1,18 @@
 #ifndef BEAVER_H
 #define BEAVER_H
 
-#ifdef _WIN32
-#undef BEAVER_AUTO_ASYNC
+#ifndef BV_ASYNC_
+#define BV_REBUILD_ASYNC_
 #endif
 
-#ifdef _WIN64
-#undef BEAVER_AUTO_ASYNC
-#endif
+#ifdef ALWAYS_SYNC
 
-#ifdef BEAVER_AUTO_ASYNC
+#undef BV_REBUILD_ASYNC_
+#undef BV_ASYNC_
 
-#ifndef BEAVER_ASYNC
-#define BEAVER_ASYNC 0
-#endif // BEAVER_ASYNC
+#else
 
-#ifndef ASAW_LOCATION
-#define ASAW_LOCATION "asaw.c"
-#endif // ASAW_LOCATION
-
-#endif //BEAVER_AUTO_ASYNC
+#endif // ALWAYS_SYNC
 
 #include <ctype.h>
 #include <stdbool.h>
@@ -29,15 +22,17 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#if BEAVER_ASYNC == 1
-
-#include "asaw.h"
-#include <pthread.h>
-
+#ifdef _WIN32
+#include <io.h>
+#define access _access
+#else
+#include <sys/wait.h>
+#include <unistd.h>
 #endif
 
-// TODO: windows
-#include <unistd.h>
+#ifndef BEAVER_MAX_PROC
+#define BEAVER_MAX_PROC 8
+#endif
 
 #define GREEN "\033[32m"
 #define RED "\033[31m"
@@ -71,6 +66,11 @@
 
 #endif // COMPILER
 
+// TODO other platforms
+#ifndef LINKER
+#define LINKER "ld"
+#endif // LINKER
+
 #ifndef BEAVER_EXTRA_FLAGS_BUFFER_SIZE
 #define BEAVER_EXTRA_FLAGS_BUFFER_SIZE 16
 #endif
@@ -90,6 +90,106 @@ struct module_t {
 
 extern module_t modules[];
 extern uint32_t modules_len;
+
+// simple thread pool ---------------------------------------------------------
+
+#ifdef BV_ASYNC_
+#include <pthread.h>
+
+#ifndef NUM_THREADS
+#define NUM_THREADS 8
+#endif
+
+typedef struct bv_task_t_ bv_task_t_;
+struct bv_task_t_ {
+    void (*fn)(void*);
+    void* arg;
+    bv_task_t_* next;
+};
+
+typedef struct bv_pool_t_ bv_pool_t_;
+struct bv_pool_t_ {
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    pthread_t threads[NUM_THREADS];
+    bv_task_t_* stack;
+    bool alive;
+};
+
+static void* bv_work_(void* a)
+{
+    bv_pool_t_* p = a;
+    bool alive = 1;
+    bv_task_t_* t = NULL;
+    while (t != NULL || alive) {
+        pthread_mutex_lock(&p->mutex);
+        while (p->alive && p->stack == NULL) {
+            pthread_cond_wait(&p->cond, &p->mutex);
+        }
+        t = p->stack;
+        if (p->stack) {
+            p->stack = p->stack->next;
+        }
+        alive = p->alive;
+        pthread_mutex_unlock(&p->mutex);
+
+        if (t) {
+            t->fn(t->arg);
+            free(t);
+        }
+    }
+    return NULL;
+}
+
+bv_pool_t_* bv_pool_create_()
+{
+    bv_pool_t_* p = malloc(sizeof(*p));
+    *p = (bv_pool_t_) {
+        .mutex = PTHREAD_MUTEX_INITIALIZER,
+        .cond = PTHREAD_COND_INITIALIZER,
+        .alive = 1,
+        .stack = NULL,
+    };
+
+    pthread_t* t;
+    for (t = p->threads; t != p->threads + NUM_THREADS; ++t) {
+        pthread_create(t, NULL, bv_work_, p);
+    }
+    return p;
+}
+
+void bv_pool_free_(bv_pool_t_* p)
+{
+    if (p == NULL) {
+        return;
+    }
+
+    pthread_mutex_lock(&p->mutex);
+    p->alive = 0;
+    pthread_mutex_unlock(&p->mutex);
+    pthread_cond_broadcast(&p->cond);
+
+    pthread_t* t;
+    for (t = p->threads; t != p->threads + NUM_THREADS; ++t) {
+        pthread_join(*t, NULL);
+    }
+    free(p);
+}
+
+void bv_pool_add_(bv_pool_t_* p, void (*fn)(void*), void* arg)
+{
+    bv_task_t_* t = malloc(sizeof(*t));
+    t->fn = fn;
+    t->arg = arg;
+
+    pthread_mutex_lock(&p->mutex);
+    t->next = p->stack;
+    p->stack = t;
+    pthread_mutex_unlock(&p->mutex);
+    pthread_cond_signal(&p->cond);
+}
+
+#endif
 
 // simple set -----------------------------------------------------------------
 
@@ -241,31 +341,18 @@ static inline void bv_recompile_beaver_(char** argv)
     uint32_t len = 0;
     uint32_t size = 0;
 
-#ifndef BEAVER_AUTO_ASYNC
-    if (argv == NULL) {
-        bv_bcmd_(&cmd, &len, &size, COMPILER " -o beaver beaver.c", 0);
-    } else {
-        bv_bcmd_(&cmd, &len, &size, COMPILER " -o beaver beaver.c &&", 0);
+#ifndef ALWAYS_SYNC
+    bv_bcmd_(&cmd, &len, &size,
+        COMPILER " -lpthread -DBV_ASYNC_ -o beaver beaver.c", 0);
+#else
+    bv_bcmd_(&cmd, &len, &size, COMPILER " -o beaver beaver.c", 0);
+#endif
+    if (argv != NULL) {
+        bv_bcmd_(&cmd, &len, &size, "&&", 1);
         for (; *argv; argv++) {
             bv_bcmd_(&cmd, &len, &size, *argv, 1);
         }
     }
-#else  // BEAVER_AUTO_ASYNC is defined
-    if (argv == NULL) {
-        bv_bcmd_(&cmd, &len, &size,
-            COMPILER " -DBEAVER_ASYNC=1 -o beaver beaver.c " ASAW_LOCATION
-                     " -lpthread",
-            0);
-    } else {
-        bv_bcmd_(&cmd, &len, &size,
-            COMPILER " -DBEAVER_ASYNC=1 -o beaver beaver.c " ASAW_LOCATION
-                     " -lpthread &&",
-            0);
-        for (; *argv; argv++) {
-            bv_bcmd_(&cmd, &len, &size, *argv, 1);
-        }
-    }
-#endif // BEAVER_AUTO_ASYNC
 
     call_or_panic(cmd);
     free(cmd);
@@ -274,6 +361,11 @@ static inline void bv_recompile_beaver_(char** argv)
 
 static inline void auto_update(char** argv)
 {
+
+#ifdef BV_REBUILD_ASYNC_
+    bv_recompile_beaver_(argv);
+#endif
+
     if (!bv_should_recomp_("beaver", "beaver.c")) {
         return;
     }
@@ -327,7 +419,9 @@ static void bv_eflags_add_(char* flags)
     }
 }
 
-static void* bv_async_call_(void* cmd)
+#ifdef BV_ASYNC_
+
+static void bv_async_call_(void* cmd)
 {
     printf(GREEN "[running" BLUE ":async" GREEN "]" RESET " %s\n", (char*)cmd);
     int r = system(cmd);
@@ -335,63 +429,40 @@ static void* bv_async_call_(void* cmd)
         fprintf(stderr, ORANGE "CBUILD WARN!: " RESET "%s\n", (char*)cmd);
     }
     free(cmd);
-    return NULL;
 }
 
-static inline void bv_compile_module_(char* name, char* flags)
-{
-    // module already compiled
-    if (bv_set_contains_(bv_modules_, name)) {
-        return;
-    }
-    bv_set_insert_(bv_modules_, name);
+static bv_pool_t_* bv_pool_ = NULL;
 
+#endif
+
+static inline void bv_compile_file_(module_t* mi, char* flags)
+{
     char* cmd = NULL;
     uint32_t len = 0;
     uint32_t size = 0;
+    bool should_recomp = 0;
+    //  TODO: windows
+    // check if directory exists
+    {
+        bv_bcmd_(&cmd, &len, &size, BEAVER_DIRECTORY, 0);
+        bv_bcmd_(&cmd, &len, &size, mi->src, 0);
 
-    module_t* mi = NULL;
-    for (mi = modules; mi != modules + modules_len; mi++) {
-        if (strcmp(mi->name, name) != 0) {
-            continue;
-        }
+        // beaver directory gurantees one /
+        char* d = rindex(cmd, '/');
+        *d = 0;
 
-        if (*mi->module != 0) {
-            bv_compile_module_(mi->module, flags);
-            continue;
-        }
-
-        if (bv_set_contains_(bv_files_, mi->src)) {
-            continue;
-        }
-
-        bv_set_insert_(bv_files_, mi->src);
-
-        bool should_recomp = 0;
-
-        //  TODO: windows
-        // check if directory exists
-        {
-            bv_bcmd_(&cmd, &len, &size, BEAVER_DIRECTORY, 0);
-            bv_bcmd_(&cmd, &len, &size, mi->src, 0);
-
-            // beaver directory gurantees one /
-            char* d = rindex(cmd, '/');
-            *d = 0;
-
-            if (access(cmd, F_OK) != 0) {
-                *cmd = 0;
-                len = 0;
-                bv_bcmd_(&cmd, &len, &size, "mkdir -p " BEAVER_DIRECTORY, 0);
-                bv_bcmd_(&cmd, &len, &size, mi->src, 0);
-                d = rindex(cmd, '/'); // same as above
-                *d = 0;
-                call_or_warn(cmd);
-                should_recomp = 1;
-            }
+        if (access(cmd, F_OK) != 0) {
             *cmd = 0;
             len = 0;
+            bv_bcmd_(&cmd, &len, &size, "mkdir -p " BEAVER_DIRECTORY, 0);
+            bv_bcmd_(&cmd, &len, &size, mi->src, 0);
+            d = rindex(cmd, '/'); // same as above
+            *d = 0;
+            call_or_warn(cmd);
+            should_recomp = 1;
         }
+        *cmd = 0;
+        len = 0;
 
         // check if file was altered
         if (!should_recomp) {
@@ -411,53 +482,77 @@ static inline void bv_compile_module_(char* name, char* flags)
             *cmd = 0;
             len = 0;
         }
+    }
+    if (should_recomp) {
+        bv_bcmd_(&cmd, &len, &size, COMPILER " -c -o " BEAVER_DIRECTORY, 0);
+        bv_bcmd_(&cmd, &len, &size, mi->src, 0);
+        bv_bcmd_(&cmd, &len, &size, ".o", 0);
+        bv_bcmd_(&cmd, &len, &size, flags, 1);
+        bv_bcmd_(&cmd, &len, &size, mi->extra_flags, 1);
+        bv_bcmd_(&cmd, &len, &size, mi->src, 1);
 
-        if (should_recomp) {
-            bv_bcmd_(&cmd, &len, &size, COMPILER " -c -o " BEAVER_DIRECTORY, 0);
-            bv_bcmd_(&cmd, &len, &size, mi->src, 0);
-            bv_bcmd_(&cmd, &len, &size, ".o", 0);
-            bv_bcmd_(&cmd, &len, &size, flags, 1);
-            bv_bcmd_(&cmd, &len, &size, mi->extra_flags, 1);
-            bv_bcmd_(&cmd, &len, &size, mi->src, 1);
-
-#if BEAVER_ASYNC == 1
-            async_noawait(bv_async_call_, cmd);
-            cmd = NULL;
-            len = 0;
-            size = 0;
+#ifdef BV_ASYNC_
+        bv_pool_add_(bv_pool_, (void (*)(void*))bv_async_call_, cmd);
+        cmd = NULL;
+        len = 0;
+        size = 0;
 #else
-            call_or_panic(cmd);
-            *cmd = 0;
-            len = 0;
+        call_or_panic(cmd);
+        *cmd = 0;
+        len = 0;
 #endif
-        }
-
-        bv_eflags_add_(mi->extra_flags);
     }
     free(cmd);
 }
 
+static inline void bv_compile_module_(char* name, char* flags)
+{
+    // module already compiled
+    if (bv_set_contains_(bv_modules_, name)) {
+        return;
+    }
+    bv_set_insert_(bv_modules_, name);
+    module_t* mi = NULL;
+    for (mi = modules; mi != modules + modules_len; mi++) {
+        if (strcmp(mi->name, name) != 0) {
+            continue;
+        }
+
+        if (*mi->module != 0) {
+            bv_compile_module_(mi->module, flags);
+            continue;
+        }
+
+        if (bv_set_contains_(bv_files_, mi->src)) {
+            continue;
+        }
+
+        bv_set_insert_(bv_files_, mi->src);
+        bv_compile_file_(mi, flags);
+        bv_eflags_add_(mi->extra_flags);
+    }
+}
+
 static inline void compile(char** program, char* flags)
 {
-
     bv_check_build_dir_();
     bv_eflags_ = bv_set_create_(BEAVER_EXTRA_FLAGS_BUFFER_SIZE);
     bv_files_ = bv_set_create_(modules_len);
     bv_modules_ = bv_set_create_(modules_len);
 
-// compile modules asynchronisly
-#if BEAVER_ASYNC == 1
-    asaw_init(4);
-#endif
+    // compile modules
     {
+#ifdef BV_ASYNC_
+        bv_pool_ = bv_pool_create_();
+#endif
         char** pi = NULL;
         for (pi = program; *pi; pi++) {
             bv_compile_module_(*pi, flags);
         }
-    }
-#if BEAVER_ASYNC == 1
-    asaw_free();
+#ifdef BV_ASYNC_
+        bv_pool_free_(bv_pool_);
 #endif
+    }
 
     // compile everything together
     {
@@ -493,6 +588,74 @@ static inline void compile(char** program, char* flags)
         free(cmd);
     }
 
+    bv_set_free_(bv_files_);
+    bv_set_free_(bv_eflags_);
+    bv_set_free_(bv_modules_);
+}
+
+static inline void prepare_all(char* flags)
+{
+#ifdef BV_ASYNC_
+    bv_pool_ = bv_pool_create_();
+#endif
+
+    module_t* mi;
+    for (mi = modules; mi != modules + modules_len; mi++) {
+        if (*mi->src != 0) {
+            bv_compile_file_(mi, flags);
+        }
+    }
+
+#ifdef BV_ASYNC_
+    bv_pool_free_(bv_pool_);
+#endif
+}
+
+static inline void compile_to_object(char** program, char* name, char* flags)
+{
+
+    bv_check_build_dir_();
+    bv_eflags_ = bv_set_create_(BEAVER_EXTRA_FLAGS_BUFFER_SIZE);
+    bv_files_ = bv_set_create_(modules_len);
+    bv_modules_ = bv_set_create_(modules_len);
+
+    // compile modules
+    {
+#ifdef BV_ASYNC_
+        bv_pool_ = bv_pool_create_();
+#endif
+        char** pi = NULL;
+        for (pi = program; *pi; pi++) {
+            bv_compile_module_(*pi, flags);
+        }
+#ifdef BV_ASYNC_
+        bv_pool_free_(bv_pool_);
+#endif
+    }
+
+    // link everything together
+    {
+        char* cmd = NULL;
+        uint32_t len = 0;
+        uint32_t size = 0;
+        bv_bcmd_(&cmd, &len, &size, LINKER " -r -o", 0);
+        bv_bcmd_(&cmd, &len, &size, name, 1);
+        char** mi = NULL;
+
+        // sources
+        for (mi = bv_files_->set; mi != bv_files_->set + bv_files_->size;
+             ++mi) {
+            if (*mi == NULL) {
+                continue;
+            }
+            bv_bcmd_(&cmd, &len, &size, BEAVER_DIRECTORY, 1);
+            bv_bcmd_(&cmd, &len, &size, *mi, 0);
+            bv_bcmd_(&cmd, &len, &size, ".o", 0);
+        }
+
+        call_or_panic(cmd);
+        free(cmd);
+    }
     bv_set_free_(bv_files_);
     bv_set_free_(bv_eflags_);
     bv_set_free_(bv_modules_);
