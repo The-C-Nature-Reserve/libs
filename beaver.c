@@ -50,11 +50,32 @@ void cr_argparse(void)
 
 void cr_all(void)
 {
-    /*prepare_all(FLAGS);*/
+    prepare_all(FLAGS);
     cr_smap();
     cr_sset();
     cr_argparse();
     cr_ezstr();
+}
+
+#define VAL(func, name)                                                        \
+    {                                                                          \
+        func();                                                                \
+        call_or_panic("valgrind --log-file=tmp_log.log ./out");                \
+        call_or_panic("echo \"==== " name " ====\" >> log.log");               \
+        call_or_panic("cat tmp_log.log >> log.log");                           \
+    }
+
+void valgrind(void)
+{
+    prepare_all(FLAGS);
+    call_or_panic("echo \"VALGRIND\" > log.log");
+
+    VAL(cr_smap, "SMAP");
+    VAL(cr_sset, "SSET");
+    VAL(cr_argparse, "ARGPARSE");
+    VAL(cr_ezstr, "EZSTR");
+
+    rm("tmp_log.log");
 }
 
 int main(int argc, char** argv)
@@ -66,6 +87,7 @@ int main(int argc, char** argv)
     } else if (strcmp(argv[1], "clean") == 0) {
         rm("$(find build/ -type f)");
         rm("out");
+        rm("log.log");
     } else if (strcmp(argv[1], "smap/") == 0) {
         cr_smap();
     } else if (strcmp(argv[1], "sset/") == 0) {
@@ -74,6 +96,8 @@ int main(int argc, char** argv)
         cr_argparse();
     } else if (strcmp(argv[1], "ezstr/") == 0) {
         cr_ezstr();
+    } else if (strcmp(argv[1], "valgrind") == 0) {
+        valgrind();
     }
     return 0;
 }
