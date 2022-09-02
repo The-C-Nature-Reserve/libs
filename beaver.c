@@ -15,6 +15,9 @@ module_t modules[] = {
 
     { .name = "ezstr", .src = "ezstr/ezstr.c" },
     { .name = "ezstr", .src = "ezstr/test.c" },
+
+    { .name = "mt32", .src = "mt32/mt32.c" },
+    { .name = "mt32", .src = "mt32/test.c" },
 };
 
 uint32_t modules_len = sizeof(modules) / sizeof(*modules);
@@ -23,6 +26,7 @@ char* smap[] = { "smap", NULL };
 char* sset[] = { "sset", NULL };
 char* argparse[] = { "argparse", NULL };
 char* ezstr[] = { "ezstr", NULL };
+char* mt32[] = { "mt32", NULL };
 
 void cr_smap(void)
 {
@@ -33,6 +37,12 @@ void cr_smap(void)
 void cr_sset(void)
 {
     compile(sset, FLAGS);
+    call_or_panic("./out");
+}
+
+void cr_mt32(void)
+{
+    compile(mt32, FLAGS);
     call_or_panic("./out");
 }
 
@@ -55,6 +65,7 @@ void cr_all(void)
     cr_sset();
     cr_argparse();
     cr_ezstr();
+    cr_mt32();
 }
 
 #define VAL(func, name)                                                        \
@@ -74,6 +85,7 @@ void valgrind(void)
     VAL(cr_sset, "SSET");
     VAL(cr_argparse, "ARGPARSE");
     VAL(cr_ezstr, "EZSTR");
+    VAL(cr_mt32, "MT32");
 
     rm("tmp_log.log");
 }
@@ -96,6 +108,8 @@ int main(int argc, char** argv)
         cr_argparse();
     } else if (strcmp(argv[1], "ezstr/") == 0) {
         cr_ezstr();
+    } else if (strcmp(argv[1], "mt32/") == 0) {
+        cr_mt32();
     } else if (strcmp(argv[1], "valgrind") == 0) {
         valgrind();
     }
